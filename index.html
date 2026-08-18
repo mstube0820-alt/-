@@ -56,11 +56,11 @@
     input[type="date"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; }
     .btn-excel { background-color: #10b981; color: white; border: none; padding: 9px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
     
-    /* 결석자 모아보기 섹션 */
-    .absent-box { background-color: #fef2f2; border: 1px solid #fecaca; }
-    .absent-title { font-weight: bold; color: var(--absent); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+    /* 미출석자(지각) 모아보기 섹션 */
+    .absent-box { background-color: #fefce8; border: 1px solid #fef08a; }
+    .absent-title { font-weight: bold; color: #ca8a04; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
     .absent-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
-    .absent-badge { background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+    .absent-badge { background: #fef08a; color: #854d0e; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
 
     /* 반 관리 탭 및 컨트롤 */
     .class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -134,14 +134,14 @@
       <button class="btn-excel" onclick="exportToCSV()">📊 엑셀(CSV) 내보내기</button>
     </div>
 
-    <!-- 전체 결석자 현황판 -->
+    <!-- 전체 미출석자(지각자) 현황판 -->
     <div class="card absent-box">
       <div class="absent-title">
-        <span>🚨 오늘의 결석자 모아보기</span>
+        <span>⏰ 오늘의 미출석자 모아보기</span>
         <span id="absentCount" style="font-size: 0.85rem; font-weight: normal;">0명</span>
       </div>
       <div class="absent-list" id="absentList">
-        <!-- 결석자 이름이 여기에 자동으로 표시됩니다 -->
+        <!-- 미출석자(지각자) 이름이 여기에 자동으로 표시됩니다 -->
       </div>
     </div>
 
@@ -421,7 +421,7 @@
       saveData();
     }
 
-    // 결석자 현황판 업데이트
+    // 미출석자(지각자) 현황판 업데이트
     function updateAbsentDisplay() {
       const date = dateInput.value;
       const absentListContainer = document.getElementById('absentList');
@@ -433,7 +433,8 @@
       Object.keys(dateData).forEach(className => {
         if (classes[className]) {
           Object.keys(dateData[className]).forEach(student => {
-            if (classes[className].includes(student) && dateData[className][student] === '결석') {
+            // 기존 '결석'에서 '지각'으로 필터링 조건 변경
+            if (classes[className].includes(student) && dateData[className][student] === '지각') {
               totalAbsent++;
               const badge = document.createElement('span');
               badge.className = 'absent-badge';
@@ -446,7 +447,7 @@
 
       document.getElementById('absentCount').innerText = `${totalAbsent}명`;
       if (totalAbsent === 0) {
-        absentListContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem;">결석한 학생이 없습니다.</span>';
+        absentListContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem;">미출석(지각) 학생이 없습니다.</span>';
       }
     }
 
