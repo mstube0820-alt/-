@@ -3,39 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>선생님 전용 출결 관리 시스템</title>
+  <title>출결 관리 시스템</title>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
-    .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
-    input, select { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-    
-    /* 구글 로그인 버튼 스타일 */
-    .google-btn {
-      background-color: #ffffff;
-      color: #757575;
-      border: 1px solid #ddd;
-      padding: 12px 20px;
-      font-size: 16px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      width: 100%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .google-btn:hover { background-color: #f8f9fa; }
-    
-    .save-btn { background-color: #007bff; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px; width: 100%; margin-top: 5px; }
-    .save-btn:hover { background-color: #0056b3; }
-    .logout-btn { background-color: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
-    
+    .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    button:hover { background-color: #0056b3; }
+    .logout-btn { background-color: #dc3545; }
+    .logout-btn:hover { background-color: #c82333; }
     .hidden { display: none; }
-    .header { display: flex; justify-content: space-between; align-items: center; text-align: left; }
-    .attendance-box { text-align: left; }
-    #attendanceList { padding-left: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
   </style>
 
   <script type="module">
@@ -54,7 +32,7 @@
       onValue 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // 선생님의 실제 Firebase 환경설정이 적용되었습니다.
+    // Firebase 설정 정보
     const firebaseConfig = {
       apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
       authDomain: "attendance-1012d.firebaseapp.com",
@@ -71,31 +49,28 @@
     const database = getDatabase(app);
     const provider = new GoogleAuthProvider();
 
-    // 구글 로그인 버튼 클릭 이벤트
-    document.getElementById("googleLoginBtn").addEventListener("click", () => {
+    // 구글 로그인 버튼
+    document.getElementById("loginBtn").addEventListener("click", () => {
       signInWithPopup(auth, provider)
-        .then((result) => {
+        .then(() => {
           document.getElementById("loginError").innerText = "";
         })
         .catch((error) => {
-          document.getElementById("loginError").innerText = "로그인 도중 오류가 발생했습니다: " + error.message;
+          document.getElementById("loginError").innerText = "로그인 오류: " + error.message;
         });
     });
 
-    // 로그아웃 버튼 클릭 이벤트
+    // 로그아웃 버튼
     document.getElementById("logoutBtn").addEventListener("click", () => {
       signOut(auth);
     });
 
-    // 인증 상태 감지
+    // 로그인 상태 체크 및 화면 전환
     onAuthStateChanged(auth, (user) => {
       if (user) {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
-        
-        // 로그인된 선생님의 이름과 이메일 표시
-        document.getElementById("userInfo").innerText = `${user.displayName || '선생님'} (${user.email})`;
-
+        document.getElementById("userInfo").innerText = user.displayName || user.email;
         initAttendanceSystem();
       } else {
         document.getElementById("loginSection").classList.remove("hidden");
@@ -103,11 +78,10 @@
       }
     });
 
-    // 출결 관리 기능
+    // 출결 기능
     function initAttendanceSystem() {
       const attendanceRef = ref(database, 'attendance');
 
-      // 실시간 출결 데이터 조회
       onValue(attendanceRef, (snapshot) => {
         const data = snapshot.val();
         const listElement = document.getElementById("attendanceList");
@@ -116,7 +90,7 @@
         if (data) {
           Object.keys(data).forEach((key) => {
             const li = document.createElement("li");
-            li.innerText = `${data[key].name} - 상태: ${data[key].status} (입력자: ${data[key].author || '미기재'})`;
+            li.innerText = `${data[key].name} - 상태: ${data[key].status}`;
             listElement.appendChild(li);
           });
         } else {
@@ -124,20 +98,16 @@
         }
       });
 
-      // 출결 기록 저장
       document.getElementById("saveBtn").onclick = () => {
         const name = document.getElementById("studentName").value.trim();
         const status = document.getElementById("status").value;
 
         if (!name) return alert("학생 이름을 입력하세요.");
 
-        const currentUser = auth.currentUser;
         const newItemRef = ref(database, 'attendance/' + Date.now());
-        
         set(newItemRef, {
           name: name,
           status: status,
-          author: currentUser ? (currentUser.displayName || currentUser.email) : "선생님",
           updatedAt: new Date().toISOString()
         }).then(() => {
           document.getElementById("studentName").value = "";
@@ -148,42 +118,33 @@
 </head>
 <body>
 
-  <!-- 구글 로그인 화면 -->
+  <!-- 로그인 화면 (기존 스타일 유지) -->
   <div id="loginSection" class="card">
-    <h2>출결 관리 시스템</h2>
-    <p>선생님 전용 시스템입니다. 구글 계정으로 로그인해 주세요.</p>
-    <br>
-    <button id="googleLoginBtn" class="google-btn">
-      <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-      </svg>
-      Google 계정으로 로그인
-    </button>
-    <p id="loginError" style="color: red; margin-top: 15px;"></p>
+    <h2>로그인</h2>
+    <p>시스템 이용을 위해 구글 계정으로 로그인해 주세요.</p>
+    <button id="loginBtn">Google 계정으로 로그인</button>
+    <p id="loginError" style="color: red; margin-top: 10px;"></p>
   </div>
 
-  <!-- 메인 출결 관리 화면 -->
-  <div id="appSection" class="card attendance-box hidden">
+  <!-- 메인 출결 화면 (기존 스타일 유지) -->
+  <div id="appSection" class="card hidden">
     <div class="header">
-      <h3>출결 관리 시스템</h3>
-      <button id="logoutBtn" class="logout-btn">로그아웃</button>
+      <h2>출결 관리 System</h2>
+      <button id="logoutBtn" class="logout-btn" style="width: auto;">로그아웃</button>
     </div>
-    <p style="color: #555; font-size: 14px;">접속 계정: <b id="userInfo"></b></p>
+    <p>접속자: <span id="userInfo"></span></p>
     <hr>
-
-    <h4>출결 체크</h4>
-    <input type="text" id="studentName" placeholder="학생 이름 입력">
+    
+    <h3>출결 입력</h3>
+    <input type="text" id="studentName" placeholder="학생 이름">
     <select id="status">
       <option value="출석">출석</option>
       <option value="결석">결석</option>
       <option value="지각">지각</option>
     </select>
-    <button id="saveBtn" class="save-btn">저장하기</button>
+    <button id="saveBtn">저장하기</button>
 
-    <h4 style="margin-top: 25px;">실시간 출결 현황</h4>
+    <h3>출결 현황</h3>
     <ul id="attendanceList"></ul>
   </div>
 
