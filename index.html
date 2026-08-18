@@ -13,6 +13,7 @@
       --present: #22c55e;
       --late: #eab308;
       --absent: #ef4444;
+      --danger: #dc2626;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -34,15 +35,22 @@
     .absent-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
     .absent-badge { background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
 
-    /* 반 탭 */
-    .class-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+    /* 반 관리 탭 및 컨트롤 */
+    .class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .class-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
     .tab-btn { padding: 8px 16px; border: 1px solid #e2e8f0; background: #fff; border-radius: 20px; font-size: 0.9rem; white-space: nowrap; cursor: pointer; }
     .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: bold; }
+    
+    .btn-class-action { background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 16px; font-size: 0.8rem; cursor: pointer; font-weight: 600; }
+    .btn-class-delete { background: #fee2e2; color: var(--danger); }
 
     /* 학생 목록 및 출결 체크 */
-    .student-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .student-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; gap: 8px; }
     .student-row:last-child { border-bottom: none; }
-    .student-name { font-weight: 500; }
+    .student-info { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .student-name { font-weight: 500; font-size: 0.95rem; }
+    .btn-delete-student { background: transparent; color: #94a3b8; border: none; cursor: pointer; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; }
+    .btn-delete-student:hover { color: var(--danger); background: #fee2e2; }
 
     .status-group { display: flex; gap: 4px; }
     .status-btn { border: 1px solid #cbd5e1; background: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
@@ -53,7 +61,7 @@
     /* 학생 추가 영역 */
     .add-student { display: flex; gap: 8px; margin-top: 12px; }
     .add-student input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
-    .add-student button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .add-student button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -71,7 +79,7 @@
   <!-- 전체 결석자 현황판 -->
   <div class="card absent-box">
     <div class="absent-title">
-      <span>🚨오늘의 결석자 모아보기</span>
+      <span>🚨 오늘의 결석자 모아보기</span>
       <span id="absentCount" style="font-size: 0.85rem; font-weight: normal;">0명</span>
     </div>
     <div class="absent-list" id="absentList">
@@ -79,7 +87,14 @@
     </div>
   </div>
 
-  <!-- 반 선택 탭 -->
+  <!-- 반 선택 및 관리 -->
+  <div class="class-header">
+    <span style="font-weight: bold; font-size: 0.9rem; color: #64748b;">학급 목록</span>
+    <div>
+      <button class="btn-class-action" onclick="addClass()">+ 반 추가</button>
+      <button class="btn-class-action btn-class-delete" onclick="deleteClass()">🗑️ 반 삭제</button>
+    </div>
+  </div>
   <div class="class-tabs" id="classTabs"></div>
 
   <!-- 출결 체크 목록 -->
@@ -88,7 +103,7 @@
     
     <!-- 학생 추가 입력창 -->
     <div class="add-student">
-      <input type="text" id="newStudentName" placeholder="새 학생 이름 입력">
+      <input type="text" id="newStudentName" placeholder="새 학생 이름 입력" onkeypress="if(event.key==='Enter') addStudent()">
       <button onclick="addStudent()">추가</button>
     </div>
   </div>
@@ -110,6 +125,13 @@
     // 초기화
     function init() {
       loadData();
+      
+      // 현재 선택 가능한 반이 없을 경우 처리
+      const classNames = Object.keys(classes);
+      if (classNames.length > 0 && !classes[currentClass]) {
+        currentClass = classNames[0];
+      }
+
       renderTabs();
       renderStudents();
       updateAbsentDisplay();
@@ -139,7 +161,14 @@
     function renderTabs() {
       const tabsContainer = document.getElementById('classTabs');
       tabsContainer.innerHTML = '';
-      Object.keys(classes).forEach(className => {
+      
+      const classNames = Object.keys(classes);
+      if (classNames.length === 0) {
+        tabsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem; padding: 4px 0;">등록된 반이 없습니다. 반을 추가해주세요.</span>';
+        return;
+      }
+
+      classNames.forEach(className => {
         const btn = document.createElement('button');
         btn.className = `tab-btn ${className === currentClass ? 'active' : ''}`;
         btn.innerText = className;
@@ -152,25 +181,78 @@
       });
     }
 
+    // 반 추가 기능
+    function addClass() {
+      const newClassName = prompt('새로 추가할 반 이름을 입력하세요 (예: 1학년 3반):');
+      if (!newClassName || !newClassName.trim()) return;
+
+      const trimmedName = newClassName.trim();
+      if (classes[trimmedName]) {
+        alert('이미 존재하는 반 이름입니다.');
+        return;
+      }
+
+      classes[trimmedName] = [];
+      currentClass = trimmedName;
+      saveData();
+      renderTabs();
+      renderStudents();
+    }
+
+    // 현재 반 삭제 기능
+    function deleteClass() {
+      const classNames = Object.keys(classes);
+      if (classNames.length === 0) {
+        alert('삭제할 반이 없습니다.');
+        return;
+      }
+
+      if (confirm(`'${currentClass}'을(를) 정말 삭제하시겠습니까?\n소속된 학생 목록도 삭제됩니다.`)) {
+        delete classes[currentClass];
+        
+        const remainingClasses = Object.keys(classes);
+        currentClass = remainingClasses.length > 0 ? remainingClasses[0] : '';
+        
+        saveData();
+        renderTabs();
+        renderStudents();
+        updateAbsentDisplay();
+      }
+    }
+
     // 학생 목록 및 출결 버튼 렌더링
     function renderStudents() {
       const listContainer = document.getElementById('studentList');
       listContainer.innerHTML = '';
+
+      if (!currentClass || !classes[currentClass]) {
+        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">반을 먼저 추가하거나 선택해주세요.</p>';
+        return;
+      }
 
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
       if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
 
       const currentAttendance = attendanceData[date][currentClass];
+      const studentList = classes[currentClass];
 
-      classes[currentClass].forEach(student => {
+      if (studentList.length === 0) {
+        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 10px 0;">등록된 학생이 없습니다. 아래에서 학생을 추가해주세요.</p>';
+        return;
+      }
+
+      studentList.forEach(student => {
         const status = currentAttendance[student] || '출석'; // 기본값: 출석
         currentAttendance[student] = status;
 
         const row = document.createElement('div');
         row.className = 'student-row';
         row.innerHTML = `
-          <span class="student-name">${student}</span>
+          <div class="student-info">
+            <span class="student-name">${student}</span>
+            <button class="btn-delete-student" onclick="deleteStudent('${student}')" title="학생 삭제">삭제</button>
+          </div>
           <div class="status-group">
             <button class="status-btn present ${status === '출석' ? 'active' : ''}" onclick="setStatus('${student}', '출석')">출석</button>
             <button class="status-btn late ${status === '지각' ? 'active' : ''}" onclick="setStatus('${student}', '지각')">지각</button>
@@ -183,6 +265,47 @@
       saveData();
     }
 
+    // 학생 추가
+    function addStudent() {
+      if (!currentClass) {
+        alert('학생을 추가할 반을 먼저 선택하거나 생성해주세요.');
+        return;
+      }
+
+      const input = document.getElementById('newStudentName');
+      const name = input.value.trim();
+      if (!name) return;
+
+      if (classes[currentClass].includes(name)) {
+        alert('이미 등록된 학생 이름입니다.');
+        return;
+      }
+
+      classes[currentClass].push(name);
+      input.value = '';
+      saveData();
+      renderStudents();
+    }
+
+    // 학생 삭제 기능
+    function deleteStudent(studentName) {
+      if (confirm(`'${studentName}' 학생을 목록에서 삭제하시겠습니까?`)) {
+        // 반 학생 목록에서 제거
+        classes[currentClass] = classes[currentClass].filter(name => name !== studentName);
+        
+        // 해당 학생의 날짜별 출결 기록도 삭제
+        Object.keys(attendanceData).forEach(date => {
+          if (attendanceData[date][currentClass] && attendanceData[date][currentClass][studentName]) {
+            delete attendanceData[date][currentClass][studentName];
+          }
+        });
+
+        saveData();
+        renderStudents();
+        updateAbsentDisplay();
+      }
+    }
+
     // 출결 상태 변경
     function setStatus(student, status) {
       const date = dateInput.value;
@@ -190,18 +313,6 @@
       saveData();
       renderStudents();
       updateAbsentDisplay();
-    }
-
-    // 학생 추가
-    function addStudent() {
-      const input = document.getElementById('newStudentName');
-      const name = input.value.trim();
-      if (!name) return;
-
-      classes[currentClass].push(name);
-      input.value = '';
-      saveData();
-      renderStudents();
     }
 
     // 전체 결석자 모아보기 업데이트
@@ -214,15 +325,19 @@
       const dateData = attendanceData[date] || {};
 
       Object.keys(dateData).forEach(className => {
-        Object.keys(dateData[className]).forEach(student => {
-          if (dateData[className][student] === '결석') {
-            totalAbsent++;
-            const badge = document.createElement('span');
-            badge.className = 'absent-badge';
-            badge.innerText = `[${className}] ${student}`;
-            absentListContainer.appendChild(badge);
-          }
-        });
+        // 남아있는 반인 경우만 체크
+        if (classes[className]) {
+          Object.keys(dateData[className]).forEach(student => {
+            // 남아있는 학생인 경우만 체크
+            if (classes[className].includes(student) && dateData[className][student] === '결석') {
+              totalAbsent++;
+              const badge = document.createElement('span');
+              badge.className = 'absent-badge';
+              badge.innerText = `[${className}] ${student}`;
+              absentListContainer.appendChild(badge);
+            }
+          });
+        }
       });
 
       document.getElementById('absentCount').innerText = `${totalAbsent}명`;
@@ -241,7 +356,7 @@
         return;
       }
 
-      let csvContent = "\uFEFF날짜,학급,이름,출결상태\n"; // UTF-8 BOM 추가 (한글 깨짐 방지)
+      let csvContent = "\uFEFF날짜,학급,이름,출결상태\n"; // UTF-8 BOM (한글 깨짐 방지)
 
       Object.keys(classes).forEach(className => {
         const classAttendance = dateData[className] || {};
