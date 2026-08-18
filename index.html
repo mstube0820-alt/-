@@ -93,7 +93,7 @@
     .hidden { display: none !important; }
   </style>
 
-  <!-- Firebase SDK (v9+ 호환 라이브러리 및 Auth 추가) -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -168,7 +168,7 @@
   </div>
 
   <script>
-    // Firebase 키 정보 설정
+    // 선생님의 Firebase 키 정보 설정
     const firebaseConfig = {
       apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
       authDomain: "attendance-1012d.firebaseapp.com",
@@ -210,7 +210,7 @@
       auth.signOut();
     }
 
-    // 인증 상태 감지 및 데이터 연결 (보안 핵심 영역)
+    // 인증 상태 감지 및 데이터 연결
     auth.onAuthStateChanged((user) => {
       const syncStatus = document.getElementById('syncStatus');
       const loginSection = document.getElementById('loginSection');
@@ -269,7 +269,7 @@
 
     // 데이터 저장
     function saveData() {
-      if (!auth.currentUser) return; // 로그인 상태가 아니면 저장 금지
+      if (!auth.currentUser) return;
       db.ref('attendance_app').set({
         classes: classes,
         attendanceData: attendanceData
