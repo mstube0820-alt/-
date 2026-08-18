@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>스마트 출결 관리 앱</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --present: #22c55e;
+      --late: #eab308;
+      --absent: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 20px; }
+    h1 { font-size: 1.4rem; color: var(--primary); margin-bottom: 12px; }
+
+    .card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
+
+    /* 날짜 선택 및 엑셀 다운로드 컨트롤 */
+    .controls { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    input[type="date"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; }
+    .btn-excel { background-color: #10b981; color: white; border: none; padding: 9px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+    
+    /* 결석자 모아보기 섹션 */
+    .absent-box { background-color: #fef2f2; border: 1px solid #fecaca; }
+    .absent-title { font-weight: bold; color: var(--absent); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+    .absent-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+    .absent-badge { background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+
+    /* 반 탭 */
+    .class-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+    .tab-btn { padding: 8px 16px; border: 1px solid #e2e8f0; background: #fff; border-radius: 20px; font-size: 0.9rem; white-space: nowrap; cursor: pointer; }
+    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: bold; }
+
+    /* 학생 목록 및 출결 체크 */
+    .student-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .student-row:last-child { border-bottom: none; }
+    .student-name { font-weight: 500; }
+
+    .status-group { display: flex; gap: 4px; }
+    .status-btn { border: 1px solid #cbd5e1; background: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+    .status-btn.present.active { background: var(--present); color: white; border-color: var(--present); }
+    .status-btn.late.active { background: var(--late); color: white; border-color: var(--late); }
+    .status-btn.absent.active { background: var(--absent); color: white; border-color: var(--absent); }
+
+    /* 학생 추가 영역 */
+    .add-student { display: flex; gap: 8px; margin-top: 12px; }
+    .add-student input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    .add-student button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📱 출결 관리 시스템</h1>
+  </header>
+
+  <!-- 날짜 선택 및 엑셀 다운로드 -->
+  <div class="card controls">
+    <input type="date" id="attendanceDate">
+    <button class="btn-excel" onclick="exportToCSV()">📊 엑셀(CSV) 내보내기</button>
+  </div>
+
+  <!-- 전체 결석자 현황판 -->
+  <div class="card absent-box">
+    <div class="absent-title">
+      <span>🚨오늘의 결석자 모아보기</span>
+      <span id="absentCount" style="font-size: 0.85rem; font-weight: normal;">0명</span>
+    </div>
+    <div class="absent-list" id="absentList">
+      <!-- 결석자 이름이 여기에 자동으로 표시됩니다 -->
+    </div>
+  </div>
+
+  <!-- 반 선택 탭 -->
+  <div class="class-tabs" id="classTabs"></div>
+
+  <!-- 출결 체크 목록 -->
+  <div class="card">
+    <div id="studentList"></div>
+    
+    <!-- 학생 추가 입력창 -->
+    <div class="add-student">
+      <input type="text" id="newStudentName" placeholder="새 학생 이름 입력">
+      <button onclick="addStudent()">추가</button>
+    </div>
+  </div>
+
+  <script>
+    // 기본 반 및 학생 데이터 구조
+    let classes = {
+      '1학년 1반': ['김철수', '이영희', '박민수'],
+      '1학년 2반': ['정수진', '최동현', '강서연']
+    };
+
+    let currentClass = '1학년 1반';
+    let attendanceData = {}; // { "YYYY-MM-DD": { "반": { "학생이름": "출석/지각/결석" } } }
+
+    // 오늘 날짜 기본 설정
+    const dateInput = document.getElementById('attendanceDate');
+    dateInput.value = new Date().toISOString().substring(0, 10);
+
+    // 초기화
+    function init() {
+      loadData();
+      renderTabs();
+      renderStudents();
+      updateAbsentDisplay();
+
+      dateInput.addEventListener('change', () => {
+        renderStudents();
+        updateAbsentDisplay();
+      });
+    }
+
+    // 로컬 저장소 데이터 로드
+    function loadData() {
+      const savedClasses = localStorage.getItem('app_classes');
+      if (savedClasses) classes = JSON.parse(savedClasses);
+
+      const savedAttendance = localStorage.getItem('app_attendance');
+      if (savedAttendance) attendanceData = JSON.parse(savedAttendance);
+    }
+
+    // 데이터 저장
+    function saveData() {
+      localStorage.setItem('app_classes', JSON.stringify(classes));
+      localStorage.setItem('app_attendance', JSON.stringify(attendanceData));
+    }
+
+    // 반 탭 렌더링
+    function renderTabs() {
+      const tabsContainer = document.getElementById('classTabs');
+      tabsContainer.innerHTML = '';
+      Object.keys(classes).forEach(className => {
+        const btn = document.createElement('button');
+        btn.className = `tab-btn ${className === currentClass ? 'active' : ''}`;
+        btn.innerText = className;
+        btn.onclick = () => {
+          currentClass = className;
+          renderTabs();
+          renderStudents();
+        };
+        tabsContainer.appendChild(btn);
+      });
+    }
+
+    // 학생 목록 및 출결 버튼 렌더링
+    function renderStudents() {
+      const listContainer = document.getElementById('studentList');
+      listContainer.innerHTML = '';
+
+      const date = dateInput.value;
+      if (!attendanceData[date]) attendanceData[date] = {};
+      if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
+
+      const currentAttendance = attendanceData[date][currentClass];
+
+      classes[currentClass].forEach(student => {
+        const status = currentAttendance[student] || '출석'; // 기본값: 출석
+        currentAttendance[student] = status;
+
+        const row = document.createElement('div');
+        row.className = 'student-row';
+        row.innerHTML = `
+          <span class="student-name">${student}</span>
+          <div class="status-group">
+            <button class="status-btn present ${status === '출석' ? 'active' : ''}" onclick="setStatus('${student}', '출석')">출석</button>
+            <button class="status-btn late ${status === '지각' ? 'active' : ''}" onclick="setStatus('${student}', '지각')">지각</button>
+            <button class="status-btn absent ${status === '결석' ? 'active' : ''}" onclick="setStatus('${student}', '결석')">결석</button>
+          </div>
+        `;
+        listContainer.appendChild(row);
+      });
+
+      saveData();
+    }
+
+    // 출결 상태 변경
+    function setStatus(student, status) {
+      const date = dateInput.value;
+      attendanceData[date][currentClass][student] = status;
+      saveData();
+      renderStudents();
+      updateAbsentDisplay();
+    }
+
+    // 학생 추가
+    function addStudent() {
+      const input = document.getElementById('newStudentName');
+      const name = input.value.trim();
+      if (!name) return;
+
+      classes[currentClass].push(name);
+      input.value = '';
+      saveData();
+      renderStudents();
+    }
+
+    // 전체 결석자 모아보기 업데이트
+    function updateAbsentDisplay() {
+      const date = dateInput.value;
+      const absentListContainer = document.getElementById('absentList');
+      absentListContainer.innerHTML = '';
+
+      let totalAbsent = 0;
+      const dateData = attendanceData[date] || {};
+
+      Object.keys(dateData).forEach(className => {
+        Object.keys(dateData[className]).forEach(student => {
+          if (dateData[className][student] === '결석') {
+            totalAbsent++;
+            const badge = document.createElement('span');
+            badge.className = 'absent-badge';
+            badge.innerText = `[${className}] ${student}`;
+            absentListContainer.appendChild(badge);
+          }
+        });
+      });
+
+      document.getElementById('absentCount').innerText = `${totalAbsent}명`;
+      if (totalAbsent === 0) {
+        absentListContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem;">결석한 학생이 없습니다.</span>';
+      }
+    }
+
+    // 엑셀(CSV) 내보내기
+    function exportToCSV() {
+      const date = dateInput.value;
+      const dateData = attendanceData[date];
+
+      if (!dateData) {
+        alert('해당 날짜의 출결 데이터가 없습니다.');
+        return;
+      }
+
+      let csvContent = "\uFEFF날짜,학급,이름,출결상태\n"; // UTF-8 BOM 추가 (한글 깨짐 방지)
+
+      Object.keys(classes).forEach(className => {
+        const classAttendance = dateData[className] || {};
+        classes[className].forEach(student => {
+          const status = classAttendance[student] || '미체크';
+          csvContent += `${date},${className},${student},${status}\n`;
+        });
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `출결현황_${date}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    init();
+  </script>
+</body>
+</html>
