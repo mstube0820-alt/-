@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>스마트 출결 관리 앱</title>
+  <title>실시간 스마트 출결 관리 앱</title>
   <style>
     :root {
       --primary: #4f46e5;
@@ -20,7 +20,8 @@
     body { background-color: var(--bg); color: var(--text); padding: 16px; max-width: 600px; margin: 0 auto; }
 
     header { text-align: center; margin-bottom: 20px; }
-    h1 { font-size: 1.4rem; color: var(--primary); margin-bottom: 12px; }
+    h1 { font-size: 1.4rem; color: var(--primary); margin-bottom: 4px; }
+    .sync-status { font-size: 0.8rem; color: #10b981; font-weight: 600; }
 
     .card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
 
@@ -63,11 +64,16 @@
     .add-student input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
     .add-student button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
   </style>
+
+  <!-- Firebase SDK (v9+ 호환 라이브러리) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
   <header>
-    <h1>📱 출결 관리 시스템</h1>
+    <h1>📱 실시간 출결 관리 시스템</h1>
+    <div class="sync-status" id="syncStatus">🟢 서버와 실시간 연결됨</div>
   </header>
 
   <!-- 날짜 선택 및 엑셀 다운로드 -->
@@ -109,32 +115,59 @@
   </div>
 
   <script>
-    // 기본 반 및 학생 데이터 구조
+    // 1. 전달해주신 Firebase 키 정보 설정
+    const firebaseConfig = {
+      apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
+      authDomain: "attendance-1012d.firebaseapp.com",
+      databaseURL: "https://attendance-1012d-default-rtdb.firebaseio.com",
+      projectId: "attendance-1012d",
+      storageBucket: "attendance-1012d.firebasestorage.app",
+      messagingSenderId: "830592757343",
+      appId: "1:830592757343:web:ad07de8d03d5a4588eb5ea",
+      measurementId: "G-T1S6FHCVKZ"
+    };
+
+    // Firebase 초기화
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 기본 데이터 구조
     let classes = {
       '1학년 1반': ['김철수', '이영희', '박민수'],
       '1학년 2반': ['정수진', '최동현', '강서연']
     };
-
     let currentClass = '1학년 1반';
-    let attendanceData = {}; // { "YYYY-MM-DD": { "반": { "학생이름": "출석/지각/결석" } } }
+    let attendanceData = {};
 
-    // 오늘 날짜 기본 설정
+    // 오늘 날짜 설정
     const dateInput = document.getElementById('attendanceDate');
     dateInput.value = new Date().toISOString().substring(0, 10);
 
-    // 초기화
+    // 초기화 및 실시간 데이터 수신 동기화
     function init() {
-      loadData();
-      
-      // 현재 선택 가능한 반이 없을 경우 처리
-      const classNames = Object.keys(classes);
-      if (classNames.length > 0 && !classes[currentClass]) {
-        currentClass = classNames[0];
-      }
+      // Firebase Realtime Database 실시간 구독 (다른 선생님이 수정하면 즉시 자동 실행)
+      db.ref('attendance_app').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          if (data.classes) classes = data.classes;
+          if (data.attendanceData) attendanceData = data.attendanceData;
+          
+          const classNames = Object.keys(classes);
+          if (classNames.length > 0 && !classes[currentClass]) {
+            currentClass = classNames[0];
+          }
 
-      renderTabs();
-      renderStudents();
-      updateAbsentDisplay();
+          renderTabs();
+          renderStudents();
+          updateAbsentDisplay();
+        } else {
+          // 서버에 데이터가 아예 없을 때만 초기 기본값 저장
+          saveData();
+        }
+      }, (error) => {
+        document.getElementById('syncStatus').innerText = '🔴 연결 오류 (권한 확인 필요)';
+        document.getElementById('syncStatus').style.color = '#ef4444';
+      });
 
       dateInput.addEventListener('change', () => {
         renderStudents();
@@ -142,19 +175,12 @@
       });
     }
 
-    // 로컬 저장소 데이터 로드
-    function loadData() {
-      const savedClasses = localStorage.getItem('app_classes');
-      if (savedClasses) classes = JSON.parse(savedClasses);
-
-      const savedAttendance = localStorage.getItem('app_attendance');
-      if (savedAttendance) attendanceData = JSON.parse(savedAttendance);
-    }
-
-    // 데이터 저장
+    // Firebase 클라우드로 데이터 전송/저장
     function saveData() {
-      localStorage.setItem('app_classes', JSON.stringify(classes));
-      localStorage.setItem('app_attendance', JSON.stringify(attendanceData));
+      db.ref('attendance_app').set({
+        classes: classes,
+        attendanceData: attendanceData
+      });
     }
 
     // 반 탭 렌더링
@@ -181,7 +207,7 @@
       });
     }
 
-    // 반 추가 기능
+    // 반 추가
     function addClass() {
       const newClassName = prompt('새로 추가할 반 이름을 입력하세요 (예: 1학년 3반):');
       if (!newClassName || !newClassName.trim()) return;
@@ -195,11 +221,9 @@
       classes[trimmedName] = [];
       currentClass = trimmedName;
       saveData();
-      renderTabs();
-      renderStudents();
     }
 
-    // 현재 반 삭제 기능
+    // 반 삭제
     function deleteClass() {
       const classNames = Object.keys(classes);
       if (classNames.length === 0) {
@@ -207,20 +231,15 @@
         return;
       }
 
-      if (confirm(`'${currentClass}'을(를) 정말 삭제하시겠습니까?\n소속된 학생 목록도 삭제됩니다.`)) {
+      if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?\n모든 스마트폰 화면에서 함께 삭제됩니다.`)) {
         delete classes[currentClass];
-        
         const remainingClasses = Object.keys(classes);
         currentClass = remainingClasses.length > 0 ? remainingClasses[0] : '';
-        
         saveData();
-        renderTabs();
-        renderStudents();
-        updateAbsentDisplay();
       }
     }
 
-    // 학생 목록 및 출결 버튼 렌더링
+    // 학생 목록 렌더링
     function renderStudents() {
       const listContainer = document.getElementById('studentList');
       listContainer.innerHTML = '';
@@ -243,7 +262,7 @@
       }
 
       studentList.forEach(student => {
-        const status = currentAttendance[student] || '출석'; // 기본값: 출석
+        const status = currentAttendance[student] || '출석';
         currentAttendance[student] = status;
 
         const row = document.createElement('div');
@@ -251,7 +270,7 @@
         row.innerHTML = `
           <div class="student-info">
             <span class="student-name">${student}</span>
-            <button class="btn-delete-student" onclick="deleteStudent('${student}')" title="학생 삭제">삭제</button>
+            <button class="btn-delete-student" onclick="deleteStudent('${student}')">삭제</button>
           </div>
           <div class="status-group">
             <button class="status-btn present ${status === '출석' ? 'active' : ''}" onclick="setStatus('${student}', '출석')">출석</button>
@@ -261,14 +280,12 @@
         `;
         listContainer.appendChild(row);
       });
-
-      saveData();
     }
 
     // 학생 추가
     function addStudent() {
       if (!currentClass) {
-        alert('학생을 추가할 반을 먼저 선택하거나 생성해주세요.');
+        alert('학생을 추가할 반을 먼저 선택해 주세요.');
         return;
       }
 
@@ -284,16 +301,13 @@
       classes[currentClass].push(name);
       input.value = '';
       saveData();
-      renderStudents();
     }
 
-    // 학생 삭제 기능
+    // 학생 삭제
     function deleteStudent(studentName) {
-      if (confirm(`'${studentName}' 학생을 목록에서 삭제하시겠습니까?`)) {
-        // 반 학생 목록에서 제거
+      if (confirm(`'${studentName}' 학생을 삭제하시겠습니까?`)) {
         classes[currentClass] = classes[currentClass].filter(name => name !== studentName);
         
-        // 해당 학생의 날짜별 출결 기록도 삭제
         Object.keys(attendanceData).forEach(date => {
           if (attendanceData[date][currentClass] && attendanceData[date][currentClass][studentName]) {
             delete attendanceData[date][currentClass][studentName];
@@ -301,21 +315,20 @@
         });
 
         saveData();
-        renderStudents();
-        updateAbsentDisplay();
       }
     }
 
-    // 출결 상태 변경
+    // 출결 상태 변경 (클릭 즉시 서버 전송)
     function setStatus(student, status) {
       const date = dateInput.value;
+      if (!attendanceData[date]) attendanceData[date] = {};
+      if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
+      
       attendanceData[date][currentClass][student] = status;
       saveData();
-      renderStudents();
-      updateAbsentDisplay();
     }
 
-    // 전체 결석자 모아보기 업데이트
+    // 결석자 현황판 업데이트
     function updateAbsentDisplay() {
       const date = dateInput.value;
       const absentListContainer = document.getElementById('absentList');
@@ -325,10 +338,8 @@
       const dateData = attendanceData[date] || {};
 
       Object.keys(dateData).forEach(className => {
-        // 남아있는 반인 경우만 체크
         if (classes[className]) {
           Object.keys(dateData[className]).forEach(student => {
-            // 남아있는 학생인 경우만 체크
             if (classes[className].includes(student) && dateData[className][student] === '결석') {
               totalAbsent++;
               const badge = document.createElement('span');
@@ -356,7 +367,7 @@
         return;
       }
 
-      let csvContent = "\uFEFF날짜,학급,이름,출결상태\n"; // UTF-8 BOM (한글 깨짐 방지)
+      let csvContent = "\uFEFF날짜,학급,이름,출결상태\n";
 
       Object.keys(classes).forEach(className => {
         const classAttendance = dateData[className] || {};
