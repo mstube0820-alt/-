@@ -193,9 +193,16 @@
     let currentClass = '1학년 1반';
     let attendanceData = {};
 
-    // 오늘 날짜 설정
+    // 한국 표준시(KST, UTC+9) 날짜 문자열(YYYY-MM-DD) 반환 함수
+    function getKSTDateString() {
+      const now = new Date();
+      const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      return kstDate.toISOString().substring(0, 10);
+    }
+
+    // 날짜 선택 요소 및 한국 시간으로 초기화
     const dateInput = document.getElementById('attendanceDate');
-    dateInput.value = new Date().toISOString().substring(0, 10);
+    dateInput.value = getKSTDateString();
 
     // 구글 로그인 함수
     function loginWithGoogle() {
@@ -332,7 +339,7 @@
       }
     }
 
-    // 학생 목록 렌더링
+    // 학생 목록 렌더링 (날짜 변경 시 기본 '출석'으로 초기화 적용)
     function renderStudents() {
       const listContainer = document.getElementById('studentList');
       listContainer.innerHTML = '';
@@ -344,7 +351,12 @@
 
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
-      if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
+      
+      let isDataCreated = false;
+      if (!attendanceData[date][currentClass]) {
+        attendanceData[date][currentClass] = {};
+        isDataCreated = true;
+      }
 
       const currentAttendance = attendanceData[date][currentClass];
       const studentList = classes[currentClass];
@@ -354,10 +366,14 @@
         return;
       }
 
+      // 새로 선택된 날짜이거나 기록이 없을 경우 '출석'으로 기본 초기화
       studentList.forEach(student => {
-        const status = currentAttendance[student] || '출석';
-        currentAttendance[student] = status;
+        if (!currentAttendance[student]) {
+          currentAttendance[student] = '출석';
+          isDataCreated = true;
+        }
 
+        const status = currentAttendance[student];
         const row = document.createElement('div');
         row.className = 'student-row';
         row.innerHTML = `
@@ -373,6 +389,11 @@
         `;
         listContainer.appendChild(row);
       });
+
+      // 초기화 데이터가 새로 생성되었다면 즉시 저장
+      if (isDataCreated) {
+        saveData();
+      }
     }
 
     // 학생 추가
@@ -411,14 +432,18 @@
       }
     }
 
-    // 출결 상태 변경
+    // 출결 상태 변경 및 즉시 반영/저장
     function setStatus(student, status) {
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
       if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
       
       attendanceData[date][currentClass][student] = status;
+      
+      // DB 저장 및 화면 즉시 갱신
       saveData();
+      renderStudents();
+      updateAbsentDisplay();
     }
 
     // 미출석자(지각자) 현황판 업데이트
@@ -433,7 +458,6 @@
       Object.keys(dateData).forEach(className => {
         if (classes[className]) {
           Object.keys(dateData[className]).forEach(student => {
-            // 기존 '결석'에서 '지각'으로 필터링 조건 변경
             if (classes[className].includes(student) && dateData[className][student] === '지각') {
               totalAbsent++;
               const badge = document.createElement('span');
