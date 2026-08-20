@@ -193,6 +193,7 @@
   </div>
 
   <script>
+    // 1. Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
       authDomain: "attendance-1012d.firebaseapp.com",
@@ -205,13 +206,22 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+
+    // 2. 네트워크 막힘/웹소켓 차단 방지를 위한 HTTP 통신 강제 전환
     const db = firebase.database();
+    try {
+      db.goOffline();
+      firebase.database().INTERNAL.forceLongPolling(); 
+      db.goOnline();
+    } catch (e) {
+      console.log("Long polling fallback:", e);
+    }
+
+    const auth = firebase.auth();
 
     let classes = {};
     let currentClass = '';
     let attendanceData = {};
-    let isSaving = false;
 
     function getKSTDateString() {
       const now = new Date();
@@ -243,9 +253,6 @@
         mainSection.classList.remove('hidden');
         document.getElementById('userName').innerText = user.displayName || user.email;
         
-        syncStatus.innerText = '🟢 실시간 동기화 완료';
-        syncStatus.style.color = '#10b981';
-
         listenToDatabase();
       } else {
         loginSection.classList.remove('hidden');
@@ -255,21 +262,31 @@
       }
     });
 
+    // 3. DB 읽기 함수 (한 번만 안정적으로 로드)
     function listenToDatabase() {
-      db.ref('attendance_app').on('value', (snapshot) => {
-        // 내가 직접 저장을 수행 중일 때는 외부 수신으로 화면이 튀지 않도록 무시
-        if (isSaving) return;
-
-        const data = snapshot.val();
-        if (data) {
-          classes = data.classes || {};
-          attendanceData = data.attendanceData || {};
-
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.innerText = '🟡 데이터 불러오는 중...';
+      syncStatus.style.color = '#eab308';
+      
+      db.ref('attendance_app').once('value')
+        .then((snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            classes = data.classes || {};
+            attendanceData = data.attendanceData || {};
+          }
           renderTabs();
           renderStudents();
           updateAbsentDisplay();
-        }
-      });
+          
+          syncStatus.innerText = '🟢 실시간 동기화 완료';
+          syncStatus.style.color = '#10b981';
+        })
+        .catch((error) => {
+          console.error("Firebase Read Error:", error);
+          syncStatus.innerText = '🔴 데이터 읽기 실패';
+          syncStatus.style.color = '#ef4444';
+        });
 
       dateInput.addEventListener('change', () => {
         renderStudents();
@@ -277,29 +294,43 @@
       });
     }
 
-    // 명확할 때만 즉시 저장하는 최적화 로직
+    // 4. 저장 함수 (타임아웃 및 예외 처리 포함)
     function saveData() {
       const user = auth.currentUser;
       const syncStatus = document.getElementById('syncStatus');
 
-      if (!user) return;
+      if (!user) {
+        alert("로그인이 필요합니다.");
+        return;
+      }
 
-      isSaving = true;
       syncStatus.innerText = '🟡 저장 중...';
       syncStatus.style.color = '#eab308';
+
+      let isResolved = false;
+      const timer = setTimeout(() => {
+        if (!isResolved) {
+          syncStatus.innerText = '🔴 저장 시간 초과 (네트워크 확인)';
+          syncStatus.style.color = '#ef4444';
+        }
+      }, 5000);
 
       db.ref('attendance_app').set({
         classes: classes,
         attendanceData: attendanceData
-      }).then(() => {
-        syncStatus.innerText = '🟢 실시간 동기화 완료';
+      })
+      .then(() => {
+        isResolved = true;
+        clearTimeout(timer);
+        syncStatus.innerText = '🟢 저장 완료';
         syncStatus.style.color = '#10b981';
-        isSaving = false;
-      }).catch((error) => {
-        syncStatus.innerText = '🔴 저장 실패';
-        syncStatus.style.color = '#ef4444';
-        isSaving = false;
+      })
+      .catch((error) => {
+        isResolved = true;
+        clearTimeout(timer);
         console.error('Firebase Save Error:', error);
+        syncStatus.innerText = '🔴 저장 실패: ' + (error.code || error.message);
+        syncStatus.style.color = '#ef4444';
       });
     }
 
@@ -454,7 +485,6 @@
       }
 
       studentList.forEach(student => {
-        // 기본값 '출석' 설정 (화면 렌더링용)
         if (!currentAttendance[student]) {
           currentAttendance[student] = '출석';
         }
