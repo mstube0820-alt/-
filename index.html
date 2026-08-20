@@ -193,7 +193,6 @@
   </div>
 
   <script>
-    // 1. Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
       authDomain: "attendance-1012d.firebaseapp.com",
@@ -207,7 +206,6 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    // 2. 네트워크 막힘/웹소켓 차단 방지를 위한 HTTP 통신 강제 전환
     const db = firebase.database();
     try {
       db.goOffline();
@@ -262,7 +260,6 @@
       }
     });
 
-    // 3. DB 읽기 함수 (한 번만 안정적으로 로드)
     function listenToDatabase() {
       const syncStatus = document.getElementById('syncStatus');
       syncStatus.innerText = '🟡 데이터 불러오는 중...';
@@ -294,7 +291,6 @@
       });
     }
 
-    // 4. 저장 함수 (타임아웃 및 예외 처리 포함)
     function saveData() {
       const user = auth.currentUser;
       const syncStatus = document.getElementById('syncStatus');
@@ -340,7 +336,7 @@
       const schoolType = selectedGrade.substring(0, 1);
       const gradeNum = selectedGrade.substring(1);
 
-      if (className.includes(`[${selectedGrade}]`) || className.includes(`(${selectedGrade})`)) {
+      if (className.includes(`(${selectedGrade})`) || className.includes(`[${selectedGrade}]`)) {
         return true;
       }
 
@@ -402,7 +398,7 @@
       
       let inputPromptText = '새로 추가할 반 이름을 입력하세요:';
       if (selectedGrade !== 'ALL') {
-        inputPromptText = `[${selectedGrade}] 학년에 추가할 반 이름을 입력하세요:`;
+        inputPromptText = `(${selectedGrade}) 학년에 추가할 반 이름을 입력하세요:`;
       }
 
       const inputName = prompt(inputPromptText, '1반');
@@ -410,8 +406,11 @@
 
       let trimmedName = inputName.trim();
 
+      // Firebase 키 금지 문자 치환 처리
+      trimmedName = trimmedName.replace(/\[/g, '(').replace(/\]/g, ')').replace(/[\.#$\/]/g, '');
+
       if (selectedGrade !== 'ALL' && !matchGrade(trimmedName, selectedGrade)) {
-        trimmedName = `[${selectedGrade}] ${trimmedName}`;
+        trimmedName = `(${selectedGrade}) ${trimmedName}`;
       }
 
       if (classes[trimmedName]) {
@@ -514,8 +513,11 @@
       }
 
       const input = document.getElementById('newStudentName');
-      const name = input.value.trim();
+      let name = input.value.trim();
       if (!name) return;
+
+      // 학생 이름에도 금지 문자가 들어가지 않도록 정제
+      name = name.replace(/[\.\[\]#$\/]/g, '');
 
       if (classes[currentClass].includes(name)) {
         alert('이미 등록된 학생 이름입니다.');
