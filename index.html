@@ -25,7 +25,7 @@
 
     .card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
 
-    /* 로그인 관련 스타일 */
+    /* 로그인 화면 */
     .login-card { text-align: center; padding: 30px 20px; }
     .login-card h2 { font-size: 1.2rem; color: var(--text); margin-bottom: 8px; }
     .login-card p { font-size: 0.9rem; color: #64748b; margin-bottom: 20px; }
@@ -47,22 +47,22 @@
     }
     .btn-google:hover { background-color: #f1f5f9; }
     
-    /* 사용자 프로필 영역 */
+    /* 사용자 프로필 */
     .user-profile { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.85rem; color: #64748b; }
     .btn-logout { background: #fee2e2; color: var(--danger); border: none; padding: 4px 10px; border-radius: 6px; font-weight: 600; cursor: pointer; }
 
-    /* 날짜 선택 및 엑셀 다운로드 컨트롤 */
+    /* 날짜 선택 및 엑셀 내보내기 */
     .controls { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
     input[type="date"] { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; }
     .btn-excel { background-color: #10b981; color: white; border: none; padding: 9px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
     
-    /* 미출석자(지각) 모아보기 섹션 */
+    /* 미출석자 현황판 */
     .absent-box { background-color: #fefce8; border: 1px solid #fef08a; }
     .absent-title { font-weight: bold; color: #ca8a04; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
     .absent-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
     .absent-badge { background: #fef08a; color: #854d0e; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
 
-    /* 학년 드롭다운 스타일 */
+    /* 학년 드롭다운 */
     .grade-selector { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     .grade-selector label { font-size: 0.9rem; font-weight: bold; color: #475569; }
     .grade-selector select {
@@ -76,7 +76,7 @@
       flex: 1;
     }
 
-    /* 반 관리 탭 및 컨트롤 */
+    /* 반 탭 관리 */
     .class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .class-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
     .tab-btn { padding: 8px 16px; border: 1px solid #e2e8f0; background: #fff; border-radius: 20px; font-size: 0.9rem; white-space: nowrap; cursor: pointer; }
@@ -85,7 +85,7 @@
     .btn-class-action { background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 16px; font-size: 0.8rem; cursor: pointer; font-weight: 600; }
     .btn-class-delete { background: #fee2e2; color: var(--danger); }
 
-    /* 학생 목록 및 출결 체크 */
+    /* 학생 목록 */
     .student-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; gap: 8px; }
     .student-row:last-child { border-bottom: none; }
     .student-info { display: flex; align-items: center; gap: 8px; flex: 1; }
@@ -99,7 +99,7 @@
     .status-btn.late.active { background: var(--late); color: white; border-color: var(--late); }
     .status-btn.absent.active { background: var(--absent); color: white; border-color: var(--absent); }
 
-    /* 학생 추가 영역 */
+    /* 학생 추가 */
     .add-student { display: flex; gap: 8px; margin-top: 12px; }
     .add-student input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
     .add-student button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
@@ -134,21 +134,18 @@
     </button>
   </div>
 
-  <!-- 2. 로그인 후 메인 출결 관리 화면 -->
+  <!-- 2. 로그인 후 메인 화면 -->
   <div id="mainSection" class="hidden">
-    <!-- 접속한 사용자 정보 및 로그아웃 버튼 -->
     <div class="user-profile">
       <span>👤 접속자: <b id="userName"></b></span>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
 
-    <!-- 날짜 선택 및 엑셀 다운로드 -->
     <div class="card controls">
       <input type="date" id="attendanceDate">
       <button class="btn-excel" onclick="exportToCSV()">📊 엑셀(CSV) 내보내기</button>
     </div>
 
-    <!-- 전체 미출석자(지각자) 현황판 -->
     <div class="card absent-box">
       <div class="absent-title">
         <span>⏰ 오늘의 미출석자 모아보기</span>
@@ -157,7 +154,6 @@
       <div class="absent-list" id="absentList"></div>
     </div>
 
-    <!-- 학년 선택 드롭다운 메뉴 -->
     <div class="grade-selector">
       <label for="gradeSelect">🎓 학년 선택:</label>
       <select id="gradeSelect" onchange="onGradeChange()">
@@ -177,7 +173,6 @@
       </select>
     </div>
 
-    <!-- 반 선택 및 관리 -->
     <div class="class-header">
       <span style="font-weight: bold; font-size: 0.9rem; color: #64748b;">학급 목록</span>
       <div>
@@ -187,11 +182,9 @@
     </div>
     <div class="class-tabs" id="classTabs"></div>
 
-    <!-- 출결 체크 목록 -->
     <div class="card">
       <div id="studentList"></div>
       
-      <!-- 학생 추가 입력창 -->
       <div class="add-student">
         <input type="text" id="newStudentName" placeholder="새 학생 이름 입력" onkeypress="if(event.key==='Enter') addStudent()">
         <button onclick="addStudent()">추가</button>
@@ -286,15 +279,33 @@
       });
     }
 
+    // 자동 저장 함수 (오류 감지 기능 강화)
     function saveData() {
-      if (!auth.currentUser) return;
+      const user = auth.currentUser;
+      const syncStatus = document.getElementById('syncStatus');
+
+      if (!user) {
+        console.warn("로그인 정보가 없어 저장이 보류되었습니다.");
+        return;
+      }
+
+      syncStatus.innerText = '🟡 저장 중...';
+      syncStatus.style.color = '#eab308';
+
       db.ref('attendance_app').set({
         classes: classes,
         attendanceData: attendanceData
+      }).then(() => {
+        syncStatus.innerText = '🟢 실시간 동기화 완료';
+        syncStatus.style.color = '#10b981';
+      }).catch((error) => {
+        syncStatus.innerText = '🔴 저장 실패';
+        syncStatus.style.color = '#ef4444';
+        alert('데이터 저장 실패! Firebase 권한(Rules) 설정을 확인해주세요.\n오류 내용: ' + error.message);
+        console.error('Firebase Save Error:', error);
       });
     }
 
-    // 학년 검색 매칭 로직
     function matchGrade(className, selectedGrade) {
       if (selectedGrade === 'ALL') return true;
 
@@ -340,7 +351,6 @@
         return;
       }
 
-      // 현재 선택된 반이 없거나 필터링 결과에 없는 경우에만 첫 반으로 세팅
       if (!currentClass || !filteredClasses.includes(currentClass)) {
         currentClass = filteredClasses[0];
       }
@@ -358,7 +368,6 @@
       });
     }
 
-    // 반 추가 (즉시 딜레이 없는 화면 반영)
     function addClass() {
       const gradeSelect = document.getElementById('gradeSelect');
       const selectedGrade = gradeSelect.value;
@@ -373,7 +382,6 @@
 
       let trimmedName = inputName.trim();
 
-      // 특정 학년 선택 시 자동 태그 부여
       if (selectedGrade !== 'ALL' && !matchGrade(trimmedName, selectedGrade)) {
         trimmedName = `[${selectedGrade}] ${trimmedName}`;
       }
@@ -383,11 +391,9 @@
         return;
       }
 
-      // 데이터 및 선택 상태 즉시 반영
       classes[trimmedName] = [];
       currentClass = trimmedName;
 
-      // 전체보기 상태에서 특정 학년 반을 만들었을 경우 해당 학년으로 선택 자동 변환
       if (selectedGrade === 'ALL') {
         const grades = ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
         for (let g of grades) {
@@ -398,13 +404,11 @@
         }
       }
 
-      // UI 즉시 업데이트 후 DB 저장
       renderTabs();
       renderStudents();
       saveData();
     }
 
-    // 반 삭제
     function deleteClass() {
       if (!currentClass || !classes[currentClass]) {
         alert('삭제할 반이 선택되지 않았습니다.');
