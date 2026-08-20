@@ -62,6 +62,20 @@
     .absent-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
     .absent-badge { background: #fef08a; color: #854d0e; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
 
+    /* 학년 드롭다운 스타일 */
+    .grade-selector { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .grade-selector label { font-size: 0.9rem; font-weight: bold; color: #475569; }
+    .grade-selector select {
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background-color: white;
+      font-weight: 600;
+      color: var(--primary);
+      flex: 1;
+    }
+
     /* 반 관리 탭 및 컨트롤 */
     .class-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .class-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
@@ -101,7 +115,7 @@
 <body>
 
   <header>
-    <h1>📱 실시간 출결 관리 시스템</h1>
+    <h1>📱 실시간 스마트 출결 관리 시스템</h1>
     <div class="sync-status" id="syncStatus">🔒 인증 상태 확인 중...</div>
   </header>
 
@@ -143,6 +157,26 @@
       <div class="absent-list" id="absentList">
         <!-- 미출석자(지각자) 이름이 여기에 자동으로 표시됩니다 -->
       </div>
+    </div>
+
+    <!-- 학년 선택 드롭다운 메뉴 -->
+    <div class="grade-selector">
+      <label for="gradeSelect">🎓 학년 선택:</label>
+      <select id="gradeSelect" onchange="onGradeChange()">
+        <option value="ALL">전체 학년 보기</option>
+        <option value="초1">초등학교 1학년 (초1)</option>
+        <option value="초2">초등학교 2학년 (초2)</option>
+        <option value="초3">초등학교 3학년 (초3)</option>
+        <option value="초4">초등학교 4학년 (초4)</option>
+        <option value="초5">초등학교 5학년 (초5)</option>
+        <option value="초6">초등학교 6학년 (초6)</option>
+        <option value="중1">중학교 1학년 (중1)</option>
+        <option value="중2">중학교 2학년 (중2)</option>
+        <option value="중3">중학교 3학년 (중3)</option>
+        <option value="고1">고등학교 1학년 (고1)</option>
+        <option value="고2">고등학교 2학년 (고2)</option>
+        <option value="고3">고등학교 3학년 (고3)</option>
+      </select>
     </div>
 
     <!-- 반 선택 및 관리 -->
@@ -187,10 +221,11 @@
 
     // 기본 데이터 구조
     let classes = {
-      '1학년 1반': ['김철수', '이영희', '박민수'],
-      '1학년 2반': ['정수진', '최동현', '강서연']
+      '초1 1반': ['김철수', '이영희'],
+      '중1 1반': ['박민수', '정수진'],
+      '고1 1반': ['최동현', '강서연']
     };
-    let currentClass = '1학년 1반';
+    let currentClass = '초1 1반';
     let attendanceData = {};
 
     // 한국 표준시(KST, UTC+9) 날짜 문자열(YYYY-MM-DD) 반환 함수
@@ -224,7 +259,6 @@
       const mainSection = document.getElementById('mainSection');
 
       if (user) {
-        // 로그인 성공 시
         loginSection.classList.add('hidden');
         mainSection.classList.remove('hidden');
         document.getElementById('userName').innerText = user.displayName || user.email;
@@ -232,10 +266,8 @@
         syncStatus.innerText = '🟢 서버와 실시간 연결됨';
         syncStatus.style.color = '#10b981';
 
-        // 서버 데이터 수신 시작
         listenToDatabase();
       } else {
-        // 미로그인 상태 시
         loginSection.classList.remove('hidden');
         mainSection.classList.add('hidden');
         
@@ -251,11 +283,6 @@
         if (data) {
           if (data.classes) classes = data.classes;
           if (data.attendanceData) attendanceData = data.attendanceData;
-          
-          const classNames = Object.keys(classes);
-          if (classNames.length > 0 && !classes[currentClass]) {
-            currentClass = classNames[0];
-          }
 
           renderTabs();
           renderStudents();
@@ -283,18 +310,57 @@
       });
     }
 
-    // 반 탭 렌더링
+    // 학년 검색 키워드 매핑 함수 (예: 초1 -> ['초1', '초등 1', '초등학교 1', '1학년'])
+    function matchGrade(className, selectedGrade) {
+      if (selectedGrade === 'ALL') return true;
+
+      const type = selectedGrade.substring(0, 1); // '초', '중', '고'
+      const num = selectedGrade.substring(1);    // '1', '2', '3' ...
+
+      // 예: 초1
+      if (className.includes(selectedGrade)) return true;
+
+      // 예: 초등학교 1학년, 중학교 2학년, 고등 3학년 등
+      const fullTypeMap = { '초': '초등', '중': '중학', '고': '고등' };
+      if (className.includes(fullTypeMap[type]) && className.includes(num + '학년')) return true;
+
+      // 예: 단순히 '1학년 1반'처럼 적힌 경우 숫자로 매칭 (초등 기본 가정)
+      if (!className.includes('초') && !className.includes('중') && !className.includes('고')) {
+        if (className.includes(num + '학년') || className.startsWith(num + '-')) return true;
+      }
+
+      return false;
+    }
+
+    // 학년 드롭다운 변경 시 호출
+    function onGradeChange() {
+      renderTabs();
+      renderStudents();
+    }
+
+    // 선택된 학년에 맞는 반 탭 렌더링
     function renderTabs() {
       const tabsContainer = document.getElementById('classTabs');
       tabsContainer.innerHTML = '';
       
-      const classNames = Object.keys(classes);
-      if (classNames.length === 0) {
-        tabsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem; padding: 4px 0;">등록된 반이 없습니다. 반을 추가해주세요.</span>';
+      const selectedGrade = document.getElementById('gradeSelect').value;
+      const allClassNames = Object.keys(classes);
+
+      // 선택된 학년에 맞는 반들만 필터링
+      const filteredClasses = allClassNames.filter(className => matchGrade(className, selectedGrade));
+
+      if (filteredClasses.length === 0) {
+        tabsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem; padding: 4px 0;">해당 학년에 등록된 반이 없습니다.</span>';
+        currentClass = '';
         return;
       }
 
-      classNames.forEach(className => {
+      // 현재 선택된 반이 필터링된 목록에 없으면 첫 번째 반으로 설정
+      if (!filteredClasses.includes(currentClass)) {
+        currentClass = filteredClasses[0];
+      }
+
+      filteredClasses.forEach(className => {
         const btn = document.createElement('button');
         btn.className = `tab-btn ${className === currentClass ? 'active' : ''}`;
         btn.innerText = className;
@@ -307,9 +373,12 @@
       });
     }
 
-    // 반 추가
+    // 반 추가 (현재 선택된 학년에 맞게 가이드 제공)
     function addClass() {
-      const newClassName = prompt('새로 추가할 반 이름을 입력하세요 (예: 1학년 3반):');
+      const selectedGrade = document.getElementById('gradeSelect').value;
+      const defaultPrefix = selectedGrade !== 'ALL' ? selectedGrade + ' ' : '';
+      
+      const newClassName = prompt('새로 추가할 반 이름을 입력하세요:', `${defaultPrefix}1반`);
       if (!newClassName || !newClassName.trim()) return;
 
       const trimmedName = newClassName.trim();
@@ -325,27 +394,25 @@
 
     // 반 삭제
     function deleteClass() {
-      const classNames = Object.keys(classes);
-      if (classNames.length === 0) {
-        alert('삭제할 반이 없습니다.');
+      if (!currentClass || !classes[currentClass]) {
+        alert('삭제할 반이 선택되지 않았습니다.');
         return;
       }
 
       if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?\n모든 선생님의 스마트폰 화면에서 함께 삭제됩니다.`)) {
         delete classes[currentClass];
-        const remainingClasses = Object.keys(classes);
-        currentClass = remainingClasses.length > 0 ? remainingClasses[0] : '';
+        currentClass = '';
         saveData();
       }
     }
 
-    // 학생 목록 렌더링 (날짜 변경 시 기본 '출석'으로 초기화 적용)
+    // 학생 목록 렌더링
     function renderStudents() {
       const listContainer = document.getElementById('studentList');
       listContainer.innerHTML = '';
 
       if (!currentClass || !classes[currentClass]) {
-        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">반을 먼저 추가하거나 선택해주세요.</p>';
+        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">반을 선택하거나 새로 추가해 주세요.</p>';
         return;
       }
 
@@ -366,7 +433,6 @@
         return;
       }
 
-      // 새로 선택된 날짜이거나 기록이 없을 경우 '출석'으로 기본 초기화
       studentList.forEach(student => {
         if (!currentAttendance[student]) {
           currentAttendance[student] = '출석';
@@ -390,7 +456,6 @@
         listContainer.appendChild(row);
       });
 
-      // 초기화 데이터가 새로 생성되었다면 즉시 저장
       if (isDataCreated) {
         saveData();
       }
@@ -432,7 +497,7 @@
       }
     }
 
-    // 출결 상태 변경 및 즉시 반영/저장
+    // 출결 상태 변경
     function setStatus(student, status) {
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
@@ -440,7 +505,6 @@
       
       attendanceData[date][currentClass][student] = status;
       
-      // DB 저장 및 화면 즉시 갱신
       saveData();
       renderStudents();
       updateAbsentDisplay();
