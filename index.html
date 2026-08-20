@@ -281,8 +281,8 @@
       db.ref('attendance_app').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          if (data.classes) classes = data.classes;
-          if (data.attendanceData) attendanceData = data.attendanceData;
+          classes = data.classes || {};
+          attendanceData = data.attendanceData || {};
 
           renderTabs();
           renderStudents();
@@ -310,20 +310,30 @@
       });
     }
 
-    // 학년 검색 키워드 매핑 함수
+    // 정밀 학년 검색 매칭 함수
     function matchGrade(className, selectedGrade) {
       if (selectedGrade === 'ALL') return true;
 
-      const type = selectedGrade.substring(0, 1); // '초', '중', '고'
-      const num = selectedGrade.substring(1);    // '1', '2', '3' ...
+      const schoolType = selectedGrade.substring(0, 1); // '초', '중', '고'
+      const gradeNum = selectedGrade.substring(1);      // '1', '2', '3' ...
 
-      if (className.includes(`[${selectedGrade}]`) || className.includes(selectedGrade)) return true;
+      // 1. 정확한 태그 검색 (예: [초2], [중1])
+      if (className.includes(`[${selectedGrade}]`) || className.includes(`(${selectedGrade})`)) {
+        return true;
+      }
 
-      const fullTypeMap = { '초': '초등', '중': '중학', '고': '고등' };
-      if (className.includes(fullTypeMap[type]) && className.includes(num + '학년')) return true;
+      // 2. 키워드 조합 검색 (예: '초등 2학년', '초등학교 2', '초2', '중3-1')
+      const typeMap = { '초': ['초등', '초'], '중': ['중학', '중'], '고': ['고등', '고'] };
+      const keywords = typeMap[schoolType] || [];
 
-      if (!className.includes('초') && !className.includes('중') && !className.includes('고')) {
-        if (className.includes(num + '학년') || className.startsWith(num + '-')) return true;
+      for (let kw of keywords) {
+        if (className.includes(kw)) {
+          // 학년 숫자 검증 (해당 학년 숫자가 반 이름에 들어있는지 확인)
+          const regex = new RegExp(`${gradeNum}(?=학년|반|-|\\s|$)`);
+          if (regex.test(className) || className.includes(`${kw}${gradeNum}`)) {
+            return true;
+          }
+        }
       }
 
       return false;
@@ -351,6 +361,7 @@
         return;
       }
 
+      // 현재 선택된 반이 필터링 목록에 없으면 첫 번째 반으로 자동 변경
       if (!filteredClasses.includes(currentClass)) {
         currentClass = filteredClasses[0];
       }
@@ -368,7 +379,7 @@
       });
     }
 
-    // 반 추가 (선택된 학년 자동 반영 및 즉시 렌더링)
+    // 반 추가 (학습 자동 태그 부여)
     function addClass() {
       const selectedGrade = document.getElementById('gradeSelect').value;
       
@@ -382,7 +393,7 @@
 
       let trimmedName = inputName.trim();
 
-      // 만약 특정 학년이 선택된 상태이고 입력값에 학명 표기가 없다면 자동 붙이기
+      // 특정 학년 선택 상태에서 학년 태그가 없는 경우 자동 생성 ([초2] 1반)
       if (selectedGrade !== 'ALL' && !matchGrade(trimmedName, selectedGrade)) {
         trimmedName = `[${selectedGrade}] ${trimmedName}`;
       }
@@ -392,29 +403,42 @@
         return;
       }
 
-      // 1. 데이터 저장
+      // 데이터 저장 및 반영
       classes[trimmedName] = [];
       currentClass = trimmedName;
       saveData();
 
-      // 2. 즉시 화면 렌더링 갱신
       renderTabs();
       renderStudents();
     }
 
-    // 반 삭제
+    // 반 삭제 (즉시 화면 반영 보장)
     function deleteClass() {
       if (!currentClass || !classes[currentClass]) {
         alert('삭제할 반이 선택되지 않았습니다.');
         return;
       }
 
-      if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?\n모든 선생님의 스마트폰 화면에서 함께 삭제됩니다.`)) {
-        delete classes[currentClass];
+      if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?\n모든 데이터가 삭제되며 이 작업은 취소할 수 없습니다.`)) {
+        const targetClass = currentClass;
+        
+        // 1. 반 목록에서 삭제
+        delete classes[targetClass];
+
+        // 2. 출결 기록 데이터에서도 해당 반 데이터 삭제
+        Object.keys(attendanceData).forEach(date => {
+          if (attendanceData[date][targetClass]) {
+            delete attendanceData[date][targetClass];
+          }
+        });
+
         currentClass = '';
+
+        // 3. 파이어베이스 DB에 반영 및 화면 즉시 새로고침
         saveData();
         renderTabs();
         renderStudents();
+        updateAbsentDisplay();
       }
     }
 
@@ -424,7 +448,7 @@
       listContainer.innerHTML = '';
 
       if (!currentClass || !classes[currentClass]) {
-        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">반을 선택하거나 새로 추가해 주세요.</p>';
+        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">선택된 반이 없거나 삭제되었습니다. 상단에서 반을 선택하세요.</p>';
         return;
       }
 
@@ -508,6 +532,7 @@
 
         saveData();
         renderStudents();
+        updateAbsentDisplay();
       }
     }
 
