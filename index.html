@@ -208,13 +208,10 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    let classes = {
-      '[초1] 1반': ['김철수', '이영희'],
-      '[중1] 1반': ['박민수', '정수진'],
-      '[고1] 1반': ['최동현', '강서연']
-    };
-    let currentClass = '[초1] 1반';
+    let classes = {};
+    let currentClass = '';
     let attendanceData = {};
+    let isSaving = false;
 
     function getKSTDateString() {
       const now = new Date();
@@ -260,6 +257,9 @@
 
     function listenToDatabase() {
       db.ref('attendance_app').on('value', (snapshot) => {
+        // 내가 직접 저장을 수행 중일 때는 외부 수신으로 화면이 튀지 않도록 무시
+        if (isSaving) return;
+
         const data = snapshot.val();
         if (data) {
           classes = data.classes || {};
@@ -268,8 +268,6 @@
           renderTabs();
           renderStudents();
           updateAbsentDisplay();
-        } else {
-          saveData();
         }
       });
 
@@ -279,16 +277,14 @@
       });
     }
 
-    // 자동 저장 함수 (오류 감지 기능 강화)
+    // 명확할 때만 즉시 저장하는 최적화 로직
     function saveData() {
       const user = auth.currentUser;
       const syncStatus = document.getElementById('syncStatus');
 
-      if (!user) {
-        console.warn("로그인 정보가 없어 저장이 보류되었습니다.");
-        return;
-      }
+      if (!user) return;
 
+      isSaving = true;
       syncStatus.innerText = '🟡 저장 중...';
       syncStatus.style.color = '#eab308';
 
@@ -298,10 +294,11 @@
       }).then(() => {
         syncStatus.innerText = '🟢 실시간 동기화 완료';
         syncStatus.style.color = '#10b981';
+        isSaving = false;
       }).catch((error) => {
         syncStatus.innerText = '🔴 저장 실패';
         syncStatus.style.color = '#ef4444';
-        alert('데이터 저장 실패! Firebase 권한(Rules) 설정을 확인해주세요.\n오류 내용: ' + error.message);
+        isSaving = false;
         console.error('Firebase Save Error:', error);
       });
     }
@@ -446,12 +443,7 @@
 
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
-      
-      let isDataCreated = false;
-      if (!attendanceData[date][currentClass]) {
-        attendanceData[date][currentClass] = {};
-        isDataCreated = true;
-      }
+      if (!attendanceData[date][currentClass]) attendanceData[date][currentClass] = {};
 
       const currentAttendance = attendanceData[date][currentClass];
       const studentList = classes[currentClass];
@@ -462,9 +454,9 @@
       }
 
       studentList.forEach(student => {
+        // 기본값 '출석' 설정 (화면 렌더링용)
         if (!currentAttendance[student]) {
           currentAttendance[student] = '출석';
-          isDataCreated = true;
         }
 
         const status = currentAttendance[student];
@@ -483,10 +475,6 @@
         `;
         listContainer.appendChild(row);
       });
-
-      if (isDataCreated) {
-        saveData();
-      }
     }
 
     function addStudent() {
