@@ -221,11 +221,11 @@
 
     // 기본 데이터 구조
     let classes = {
-      '초1 1반': ['김철수', '이영희'],
-      '중1 1반': ['박민수', '정수진'],
-      '고1 1반': ['최동현', '강서연']
+      '[초1] 1반': ['김철수', '이영희'],
+      '[중1] 1반': ['박민수', '정수진'],
+      '[고1] 1반': ['최동현', '강서연']
     };
-    let currentClass = '초1 1반';
+    let currentClass = '[초1] 1반';
     let attendanceData = {};
 
     // 한국 표준시(KST, UTC+9) 날짜 문자열(YYYY-MM-DD) 반환 함수
@@ -310,21 +310,18 @@
       });
     }
 
-    // 학년 검색 키워드 매핑 함수 (예: 초1 -> ['초1', '초등 1', '초등학교 1', '1학년'])
+    // 학년 검색 키워드 매핑 함수
     function matchGrade(className, selectedGrade) {
       if (selectedGrade === 'ALL') return true;
 
       const type = selectedGrade.substring(0, 1); // '초', '중', '고'
       const num = selectedGrade.substring(1);    // '1', '2', '3' ...
 
-      // 예: 초1
-      if (className.includes(selectedGrade)) return true;
+      if (className.includes(`[${selectedGrade}]`) || className.includes(selectedGrade)) return true;
 
-      // 예: 초등학교 1학년, 중학교 2학년, 고등 3학년 등
       const fullTypeMap = { '초': '초등', '중': '중학', '고': '고등' };
       if (className.includes(fullTypeMap[type]) && className.includes(num + '학년')) return true;
 
-      // 예: 단순히 '1학년 1반'처럼 적힌 경우 숫자로 매칭 (초등 기본 가정)
       if (!className.includes('초') && !className.includes('중') && !className.includes('고')) {
         if (className.includes(num + '학년') || className.startsWith(num + '-')) return true;
       }
@@ -346,7 +343,6 @@
       const selectedGrade = document.getElementById('gradeSelect').value;
       const allClassNames = Object.keys(classes);
 
-      // 선택된 학년에 맞는 반들만 필터링
       const filteredClasses = allClassNames.filter(className => matchGrade(className, selectedGrade));
 
       if (filteredClasses.length === 0) {
@@ -355,7 +351,6 @@
         return;
       }
 
-      // 현재 선택된 반이 필터링된 목록에 없으면 첫 번째 반으로 설정
       if (!filteredClasses.includes(currentClass)) {
         currentClass = filteredClasses[0];
       }
@@ -373,23 +368,38 @@
       });
     }
 
-    // 반 추가 (현재 선택된 학년에 맞게 가이드 제공)
+    // 반 추가 (선택된 학년 자동 반영 및 즉시 렌더링)
     function addClass() {
       const selectedGrade = document.getElementById('gradeSelect').value;
-      const defaultPrefix = selectedGrade !== 'ALL' ? selectedGrade + ' ' : '';
       
-      const newClassName = prompt('새로 추가할 반 이름을 입력하세요:', `${defaultPrefix}1반`);
-      if (!newClassName || !newClassName.trim()) return;
+      let inputPromptText = '새로 추가할 반 이름을 입력하세요:';
+      if (selectedGrade !== 'ALL') {
+        inputPromptText = `[${selectedGrade}] 학년에 추가할 반 이름을 입력하세요:`;
+      }
 
-      const trimmedName = newClassName.trim();
+      const inputName = prompt(inputPromptText, '1반');
+      if (!inputName || !inputName.trim()) return;
+
+      let trimmedName = inputName.trim();
+
+      // 만약 특정 학년이 선택된 상태이고 입력값에 학명 표기가 없다면 자동 붙이기
+      if (selectedGrade !== 'ALL' && !matchGrade(trimmedName, selectedGrade)) {
+        trimmedName = `[${selectedGrade}] ${trimmedName}`;
+      }
+
       if (classes[trimmedName]) {
         alert('이미 존재하는 반 이름입니다.');
         return;
       }
 
+      // 1. 데이터 저장
       classes[trimmedName] = [];
       currentClass = trimmedName;
       saveData();
+
+      // 2. 즉시 화면 렌더링 갱신
+      renderTabs();
+      renderStudents();
     }
 
     // 반 삭제
@@ -403,6 +413,8 @@
         delete classes[currentClass];
         currentClass = '';
         saveData();
+        renderTabs();
+        renderStudents();
       }
     }
 
@@ -480,6 +492,7 @@
       classes[currentClass].push(name);
       input.value = '';
       saveData();
+      renderStudents();
     }
 
     // 학생 삭제
@@ -494,6 +507,7 @@
         });
 
         saveData();
+        renderStudents();
       }
     }
 
