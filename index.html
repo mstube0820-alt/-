@@ -154,9 +154,7 @@
         <span>⏰ 오늘의 미출석자 모아보기</span>
         <span id="absentCount" style="font-size: 0.85rem; font-weight: normal;">0명</span>
       </div>
-      <div class="absent-list" id="absentList">
-        <!-- 미출석자(지각자) 이름이 여기에 자동으로 표시됩니다 -->
-      </div>
+      <div class="absent-list" id="absentList"></div>
     </div>
 
     <!-- 학년 선택 드롭다운 메뉴 -->
@@ -202,7 +200,6 @@
   </div>
 
   <script>
-    // 선생님의 Firebase 키 정보 설정
     const firebaseConfig = {
       apiKey: "AIzaSyCRyCplQ8n2RBqzLtKYJ216_FBMQGNyNEg",
       authDomain: "attendance-1012d.firebaseapp.com",
@@ -214,12 +211,10 @@
       measurementId: "G-T1S6FHCVKZ"
     };
 
-    // Firebase 초기화
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // 기본 데이터 구조
     let classes = {
       '[초1] 1반': ['김철수', '이영희'],
       '[중1] 1반': ['박민수', '정수진'],
@@ -228,31 +223,26 @@
     let currentClass = '[초1] 1반';
     let attendanceData = {};
 
-    // 한국 표준시(KST, UTC+9) 날짜 문자열(YYYY-MM-DD) 반환 함수
     function getKSTDateString() {
       const now = new Date();
       const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
       return kstDate.toISOString().substring(0, 10);
     }
 
-    // 날짜 선택 요소 및 한국 시간으로 초기화
     const dateInput = document.getElementById('attendanceDate');
     dateInput.value = getKSTDateString();
 
-    // 구글 로그인 함수
     function loginWithGoogle() {
       const provider = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(provider).catch((error) => {
-        alert("로그인 도중 오류가 발생했습니다: " + error.message);
+        alert("로그인 오류: " + error.message);
       });
     }
 
-    // 로그아웃 함수
     function logout() {
       auth.signOut();
     }
 
-    // 인증 상태 감지 및 데이터 연결
     auth.onAuthStateChanged((user) => {
       const syncStatus = document.getElementById('syncStatus');
       const loginSection = document.getElementById('loginSection');
@@ -263,20 +253,18 @@
         mainSection.classList.remove('hidden');
         document.getElementById('userName').innerText = user.displayName || user.email;
         
-        syncStatus.innerText = '🟢 서버와 실시간 연결됨';
+        syncStatus.innerText = '🟢 실시간 동기화 완료';
         syncStatus.style.color = '#10b981';
 
         listenToDatabase();
       } else {
         loginSection.classList.remove('hidden');
         mainSection.classList.add('hidden');
-        
-        syncStatus.innerText = '🔴 로그인이 필요합니다';
+        syncStatus.innerText = '🔴 로그인 필요';
         syncStatus.style.color = '#ef4444';
       }
     });
 
-    // 실시간 데이터베이스 구독
     function listenToDatabase() {
       db.ref('attendance_app').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -290,9 +278,6 @@
         } else {
           saveData();
         }
-      }, (error) => {
-        document.getElementById('syncStatus').innerText = '🔴 접근 권한 오류';
-        document.getElementById('syncStatus').style.color = '#ef4444';
       });
 
       dateInput.addEventListener('change', () => {
@@ -301,7 +286,6 @@
       });
     }
 
-    // 데이터 저장
     function saveData() {
       if (!auth.currentUser) return;
       db.ref('attendance_app').set({
@@ -310,25 +294,22 @@
       });
     }
 
-    // 정밀 학년 검색 매칭 함수
+    // 학년 검색 매칭 로직
     function matchGrade(className, selectedGrade) {
       if (selectedGrade === 'ALL') return true;
 
-      const schoolType = selectedGrade.substring(0, 1); // '초', '중', '고'
-      const gradeNum = selectedGrade.substring(1);      // '1', '2', '3' ...
+      const schoolType = selectedGrade.substring(0, 1);
+      const gradeNum = selectedGrade.substring(1);
 
-      // 1. 정확한 태그 검색 (예: [초2], [중1])
       if (className.includes(`[${selectedGrade}]`) || className.includes(`(${selectedGrade})`)) {
         return true;
       }
 
-      // 2. 키워드 조합 검색 (예: '초등 2학년', '초등학교 2', '초2', '중3-1')
       const typeMap = { '초': ['초등', '초'], '중': ['중학', '중'], '고': ['고등', '고'] };
       const keywords = typeMap[schoolType] || [];
 
       for (let kw of keywords) {
         if (className.includes(kw)) {
-          // 학년 숫자 검증 (해당 학년 숫자가 반 이름에 들어있는지 확인)
           const regex = new RegExp(`${gradeNum}(?=학년|반|-|\\s|$)`);
           if (regex.test(className) || className.includes(`${kw}${gradeNum}`)) {
             return true;
@@ -339,13 +320,11 @@
       return false;
     }
 
-    // 학년 드롭다운 변경 시 호출
     function onGradeChange() {
       renderTabs();
       renderStudents();
     }
 
-    // 선택된 학년에 맞는 반 탭 렌더링
     function renderTabs() {
       const tabsContainer = document.getElementById('classTabs');
       tabsContainer.innerHTML = '';
@@ -356,13 +335,13 @@
       const filteredClasses = allClassNames.filter(className => matchGrade(className, selectedGrade));
 
       if (filteredClasses.length === 0) {
-        tabsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem; padding: 4px 0;">해당 학년에 등록된 반이 없습니다.</span>';
+        tabsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 0.85rem; padding: 4px 0;">등록된 반이 없습니다.</span>';
         currentClass = '';
         return;
       }
 
-      // 현재 선택된 반이 필터링 목록에 없으면 첫 번째 반으로 자동 변경
-      if (!filteredClasses.includes(currentClass)) {
+      // 현재 선택된 반이 없거나 필터링 결과에 없는 경우에만 첫 반으로 세팅
+      if (!currentClass || !filteredClasses.includes(currentClass)) {
         currentClass = filteredClasses[0];
       }
 
@@ -379,9 +358,10 @@
       });
     }
 
-    // 반 추가 (학습 자동 태그 부여)
+    // 반 추가 (즉시 딜레이 없는 화면 반영)
     function addClass() {
-      const selectedGrade = document.getElementById('gradeSelect').value;
+      const gradeSelect = document.getElementById('gradeSelect');
+      const selectedGrade = gradeSelect.value;
       
       let inputPromptText = '새로 추가할 반 이름을 입력하세요:';
       if (selectedGrade !== 'ALL') {
@@ -393,7 +373,7 @@
 
       let trimmedName = inputName.trim();
 
-      // 특정 학년 선택 상태에서 학년 태그가 없는 경우 자동 생성 ([초2] 1반)
+      // 특정 학년 선택 시 자동 태그 부여
       if (selectedGrade !== 'ALL' && !matchGrade(trimmedName, selectedGrade)) {
         trimmedName = `[${selectedGrade}] ${trimmedName}`;
       }
@@ -403,29 +383,39 @@
         return;
       }
 
-      // 데이터 저장 및 반영
+      // 데이터 및 선택 상태 즉시 반영
       classes[trimmedName] = [];
       currentClass = trimmedName;
-      saveData();
 
+      // 전체보기 상태에서 특정 학년 반을 만들었을 경우 해당 학년으로 선택 자동 변환
+      if (selectedGrade === 'ALL') {
+        const grades = ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
+        for (let g of grades) {
+          if (matchGrade(trimmedName, g)) {
+            gradeSelect.value = g;
+            break;
+          }
+        }
+      }
+
+      // UI 즉시 업데이트 후 DB 저장
       renderTabs();
       renderStudents();
+      saveData();
     }
 
-    // 반 삭제 (즉시 화면 반영 보장)
+    // 반 삭제
     function deleteClass() {
       if (!currentClass || !classes[currentClass]) {
         alert('삭제할 반이 선택되지 않았습니다.');
         return;
       }
 
-      if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?\n모든 데이터가 삭제되며 이 작업은 취소할 수 없습니다.`)) {
+      if (confirm(`'${currentClass}'을(를) 삭제하시겠습니까?`)) {
         const targetClass = currentClass;
         
-        // 1. 반 목록에서 삭제
         delete classes[targetClass];
 
-        // 2. 출결 기록 데이터에서도 해당 반 데이터 삭제
         Object.keys(attendanceData).forEach(date => {
           if (attendanceData[date][targetClass]) {
             delete attendanceData[date][targetClass];
@@ -434,21 +424,19 @@
 
         currentClass = '';
 
-        // 3. 파이어베이스 DB에 반영 및 화면 즉시 새로고침
-        saveData();
         renderTabs();
         renderStudents();
         updateAbsentDisplay();
+        saveData();
       }
     }
 
-    // 학생 목록 렌더링
     function renderStudents() {
       const listContainer = document.getElementById('studentList');
       listContainer.innerHTML = '';
 
       if (!currentClass || !classes[currentClass]) {
-        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">선택된 반이 없거나 삭제되었습니다. 상단에서 반을 선택하세요.</p>';
+        listContainer.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px 0;">선택된 반이 없습니다. 상단에서 반을 선택하세요.</p>';
         return;
       }
 
@@ -497,7 +485,6 @@
       }
     }
 
-    // 학생 추가
     function addStudent() {
       if (!currentClass) {
         alert('학생을 추가할 반을 먼저 선택해 주세요.');
@@ -515,11 +502,10 @@
 
       classes[currentClass].push(name);
       input.value = '';
-      saveData();
       renderStudents();
+      saveData();
     }
 
-    // 학생 삭제
     function deleteStudent(studentName) {
       if (confirm(`'${studentName}' 학생을 삭제하시겠습니까?`)) {
         classes[currentClass] = classes[currentClass].filter(name => name !== studentName);
@@ -530,13 +516,12 @@
           }
         });
 
-        saveData();
         renderStudents();
         updateAbsentDisplay();
+        saveData();
       }
     }
 
-    // 출결 상태 변경
     function setStatus(student, status) {
       const date = dateInput.value;
       if (!attendanceData[date]) attendanceData[date] = {};
@@ -544,12 +529,11 @@
       
       attendanceData[date][currentClass][student] = status;
       
-      saveData();
       renderStudents();
       updateAbsentDisplay();
+      saveData();
     }
 
-    // 미출석자(지각자) 현황판 업데이트
     function updateAbsentDisplay() {
       const date = dateInput.value;
       const absentListContainer = document.getElementById('absentList');
@@ -578,7 +562,6 @@
       }
     }
 
-    // 엑셀(CSV) 내보내기
     function exportToCSV() {
       const date = dateInput.value;
       const dateData = attendanceData[date];
